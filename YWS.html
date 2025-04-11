@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Attendance Calculator</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #000000;
+            --card-bg: #f0f0f0;
+        }
+
+        body.dark {
+            --bg-color: #1e1e1e;
+            --text-color: #ffffff;
+            --card-bg: #2c2c2c;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 50px;
+            transition: background-color 0.4s, color 0.4s;
+        }
+
+        .shiny-text {
+            font-size: 36px;
+            font-weight: bold;
+            background: linear-gradient(90deg, red, orange, yellow, green, blue, indigo, violet);
+            background-size: 400%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: shine 5s linear infinite;
+        }
+
+        @keyframes shine {
+            0% { background-position: 0% 50%; }
+            100% { background-position: 100% 50%; }
+        }
+
+        input, button {
+            margin: 10px;
+            padding: 8px;
+            font-size: 16px;
+            border-radius: 8px;
+            border: none;
+        }
+
+        button {
+            background-color: #3498db;
+            color: white;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #2980b9;
+        }
+
+        #result {
+            font-size: 20px;
+            font-weight: bold;
+            margin-top: 20px;
+        }
+
+        canvas {
+            margin-top: 30px;
+        }
+
+        #themeToggle {
+            margin-top: 20px;
+            cursor: pointer;
+            padding: 10px 20px;
+            background-color: #555;
+            color: white;
+            border: none;
+            border-radius: 8px;
+        }
+
+        .header-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .header-image {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid var(--text-color);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header-container">
+        <h1 class="shiny-text">YOUR WEB HERE</h1>
+        <img src="https://assets.onecompiler.app/43343zce7/43eetqsms/IMG-20250411-WA0012.jpg" alt="Logo" class="header-image" />
+    </div>
+
+    <h2>Attendance Percentage Calculator</h2>
+
+    <label for="lastMonth">Last Month’s Attendance (%):</label>
+    <input type="number" id="lastMonth" min="0" max="100" step="0.01" required><br>
+
+    <label for="totalDays">Total Days Present in this Month:</label>
+    <input type="number" id="totalDays" min="1" required><br>
+
+    <label for="absentDays">Absent Days:</label>
+    <input type="number" id="absentDays" min="0" required><br>
+
+    <input type="checkbox" id="removeWeekends">
+    <label for="removeWeekends">Exclude Saturdays & Sundays</label><br>
+
+    <button onclick="calculateAttendance()">Calculate</button>
+    <button onclick="resetAll()">Reset</button>
+
+    <p id="result"></p>
+
+    <canvas id="attendanceChart" width="400" height="200"></canvas>
+
+    <button id="themeToggle" onclick="toggleTheme()">Toggle Dark Mode</button>
+
+    <script>
+        // Load saved theme and data
+        window.onload = function () {
+            if (localStorage.getItem("theme") === "dark") {
+                document.body.classList.add("dark");
+            }
+
+            ["lastMonth", "totalDays", "absentDays"].forEach(id => {
+                if (localStorage.getItem(id)) {
+                    document.getElementById(id).value = localStorage.getItem(id);
+                }
+            });
+
+            document.getElementById("removeWeekends").checked = localStorage.getItem("removeWeekends") === "true";
+
+            drawChart();
+        };
+
+        function toggleTheme() {
+            document.body.classList.toggle("dark");
+            const theme = document.body.classList.contains("dark") ? "dark" : "light";
+            localStorage.setItem("theme", theme);
+        }
+
+        function calculateAttendance() {
+            let lastMonthPercent = parseFloat(document.getElementById("lastMonth").value);
+            let totalDays = parseInt(document.getElementById("totalDays").value);
+            let absentDays = parseInt(document.getElementById("absentDays").value);
+            let excludeWeekends = document.getElementById("removeWeekends").checked;
+
+            if (isNaN(lastMonthPercent) || isNaN(totalDays) || isNaN(absentDays) || totalDays < absentDays || lastMonthPercent < 0 || lastMonthPercent > 100) {
+                document.getElementById("result").innerHTML = "Please enter valid numbers.";
+                return;
+            }
+
+            // Save form values
+            localStorage.setItem("lastMonth", lastMonthPercent);
+            localStorage.setItem("totalDays", totalDays);
+            localStorage.setItem("absentDays", absentDays);
+            localStorage.setItem("removeWeekends", excludeWeekends);
+
+            if (excludeWeekends) {
+                let fullWeeks = Math.floor(totalDays / 7);
+                let remainingDays = totalDays % 7;
+                let weekends = fullWeeks * 2 + (remainingDays >= 6 ? 1 : 0);
+                totalDays -= weekends;
+            }
+
+            let presentDays = totalDays - absentDays;
+            let thisMonthPercent = (presentDays / totalDays) * 100;
+            let averagePercent = (lastMonthPercent + thisMonthPercent) / 2;
+
+            document.getElementById("result").innerHTML = 
+                `Present Days: ${presentDays} <br>
+                 Absent Days: ${absentDays} <br>
+                 This Month’s Attendance: ${thisMonthPercent.toFixed(2)}% <br>
+                 Overall Average Attendance: ${averagePercent.toFixed(2)}%`;
+
+            let history = JSON.parse(localStorage.getItem("attendanceHistory")) || [];
+            let monthLabel = `Month ${history.length + 1}`;
+            history.push({ label: monthLabel, value: thisMonthPercent.toFixed(2) });
+            localStorage.setItem("attendanceHistory", JSON.stringify(history));
+
+            drawChart();
+        }
+
+        function drawChart() {
+            let ctx = document.getElementById("attendanceChart").getContext("2d");
+            let history = JSON.parse(localStorage.getItem("attendanceHistory")) || [];
+            let labels = history.map(entry => entry.label);
+            let data = history.map(entry => parseFloat(entry.value));
+
+            if (window.attendanceChart) {
+                window.attendanceChart.destroy();
+            }
+
+            window.attendanceChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Attendance %',
+                        data: data,
+                        backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100
+                        }
+                    }
+                }
+            });
+        }
+
+        function resetAll() {
+            ["lastMonth", "totalDays", "absentDays"].forEach(id => {
+                document.getElementById(id).value = '';
+                localStorage.removeItem(id);
+            });
+
+            document.getElementById("removeWeekends").checked = false;
+            localStorage.removeItem("removeWeekends");
+
+            document.getElementById("result").innerHTML = '';
+            localStorage.removeItem("attendanceHistory");
+
+            if (window.attendanceChart) {
+                window.attendanceChart.destroy();
+            }
+        }
+    </script>
+
+</body>
+</html>
